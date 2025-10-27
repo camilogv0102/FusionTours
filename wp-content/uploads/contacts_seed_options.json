@@ -1,0 +1,65 @@
+{
+  "contacto_hero_titulo": "CONT\u00c1CTANOS",
+  "contacto_form_shortcode": "[elementor-template id=\"67\"]",
+  "contacto_hero_image_path": "snc-media/contact.png",
+  "contacto_info": [
+    {
+      "titulo": "EMAILS:",
+      "items": [
+        {
+          "label": "",
+          "valor": "RESERVATIONSFUSIONTOURSRVM@GMAIL.COM",
+          "enlace": "mailto:reservationsfusiontoursrvm@gmail.com"
+        },
+        {
+          "label": "",
+          "valor": "FUSIONTOURSRVM2025@GMAIL.COM",
+          "enlace": "mailto:fusiontoursrvm2025@gmail.com"
+        }
+      ]
+    },
+    {
+      "titulo": "WHATSAPP - VENTAS/SALES:",
+      "items": [
+        {
+          "label": "",
+          "valor": "+52 984-254-9858",
+          "enlace": "https://wa.me/529842549858"
+        },
+        {
+          "label": "",
+          "valor": "+52 322-229-0911",
+          "enlace": "https://wa.me/523222290911"
+        }
+      ]
+    },
+    {
+      "titulo": "ATENCIÓN AL CLIENTE / CUSTOMER SERVICE",
+      "items": [
+        {
+          "label": "",
+          "valor": "+52 984-131-2269",
+          "enlace": "tel:+529841312269"
+        }
+      ]
+    }
+  ],
+  "contacto_social": [
+    {
+      "nombre": "Facebook",
+      "url": "https://www.facebook.com/fusiontoursrvm"
+    },
+    {
+      "nombre": "WhatsApp",
+      "url": "https://wa.me/529842549858"
+    },
+    {
+      "nombre": "Twitter",
+      "url": "https://x.com/FusionToursRVM"
+    },
+    {
+      "nombre": "Instagram",
+      "url": "https://www.instagram.com/fusiontoursrvm"
+    }
+  ]
+}

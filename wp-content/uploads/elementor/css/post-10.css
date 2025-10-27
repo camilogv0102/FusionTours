@@ -1,0 +1,41 @@
+.elementor-10 .elementor-element.elementor-element-2dcf8f7a{--display:flex;}@media(min-width:768px){.elementor-10 .elementor-element.elementor-element-2dcf8f7a{--content-width:1500px;}}/* Start custom CSS for shortcode, class: .elementor-element-87c7e8d */.manaslu-checkout-form {
+    max-width: unset !important;
+}
+
+.manaslu-checkout-grid {
+    grid-template-columns: minmax(0px, 1fr) minmax(40%, 40%) !important;
+    align-items: flex-start;
+}
+
+.manaslu-checkout-summary{
+    max-height: unset !important;
+}
+.mvcf-summary-row span,
+.manaslu-checkout-summary .woocommerce-Price-amount{
+    text-align: right !important;
+    justify-content: end;
+}
+
+.woocommerce-Price-currencySymbol{
+    width: auto !important;
+}
+@media (max-width:767px){
+    .manaslu-checkout-grid{
+        display: flex !important;
+        flex-direction: column;
+    }
+}
+
+.elementor-10 .elementor-element.elementor-element-87c7e8d .form-row.place-order{
+    padding: 0 !important;
+}
+
+.elementor-10 .elementor-element.elementor-element-87c7e8d .mvcf-checkbox-label{
+    display: flex;
+}
+.elementor-10 .elementor-element.elementor-element-87c7e8d .mvcf-checkbox{
+    margin: 0 !important;
+}
+.elementor-10 .elementor-element.elementor-element-87c7e8d .form-row.place-order::before{
+    content: unset !important;
+}/* End custom CSS */
