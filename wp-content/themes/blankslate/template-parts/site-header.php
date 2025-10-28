@@ -106,6 +106,26 @@ $mobile_menu_classes = [
 
 $mobile_menu_classes[] = 'bg-[rgba(45,45,45,0.95)]';
 $mobile_menu_classes[] = 'text-[#FFFDE5]';
+
+$current_currency_code = function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : 'USD';
+$current_currency_label = $current_currency_code;
+$available_currencies   = [];
+
+if ( isset( $GLOBALS['WOOCS'] ) && is_object( $GLOBALS['WOOCS'] ) ) {
+	/** @var WOOCS $woocs */
+	$woocs = $GLOBALS['WOOCS'];
+	$currencies = $woocs->get_currencies();
+	if ( ! empty( $currencies ) && is_array( $currencies ) ) {
+		$available_currencies = $currencies;
+		if ( ! empty( $woocs->current_currency ) ) {
+			$current_currency_code = $woocs->current_currency;
+		}
+	}
+}
+
+if ( isset( $available_currencies[ $current_currency_code ] ) ) {
+	$current_currency_label = $available_currencies[ $current_currency_code ]['name'];
+}
 ?>
 
 <header class="fusion-site-header <?php echo esc_attr( $mode_class ); ?>" role="banner">
@@ -135,13 +155,36 @@ $mobile_menu_classes[] = 'text-[#FFFDE5]';
 							<path d="M3.95007 3.94964C3.86649 4.03325 3.76726 4.09956 3.65805 4.14481C3.54884 4.19006 3.43178 4.21335 3.31357 4.21335C3.19535 4.21335 3.0783 4.19006 2.96909 4.14481C2.85987 4.09956 2.76064 4.03325 2.67707 3.94964L0.277068 1.54964C0.190585 1.46672 0.121529 1.36737 0.0739491 1.25741C0.0263693 1.14745 0.00122424 1.0291 -1.22098e-05 0.90929C-0.00124866 0.789484 0.0214488 0.670637 0.0667488 0.559719C0.112049 0.4488 0.179041 0.348043 0.263794 0.263356C0.348548 0.178669 0.449357 0.111757 0.56031 0.0665441C0.671264 0.0213309 0.790129 -0.00127264 0.909934 5.77203e-05C1.02974 0.00138809 1.14807 0.0266266 1.25721 0.0739795C1.36636 0.121332 1.46558 0.190091 1.54907 0.276644L3.31357 2.04114L5.07807 0.276644C5.24908 0.105639 5.48757 0.0095184 5.73532 0.0095184C5.98307 0.0095184 6.22156 0.105639 6.39257 0.276644C6.56357 0.44765 6.65969 0.686139 6.65969 0.933889C6.65969 1.18164 6.56357 1.42013 6.39257 1.59114L3.94944 3.94964H3.95007Z" fill="currentColor"/>
 						</svg>
 					</button>
-					<div class="relative">
+					<div class="relative" data-currency-switcher>
 						<button type="button" class="fusion-currency-toggle box-border flex justify-center items-center gap-[15px] m-0 p-0 cursor-pointer hover:opacity-80 transition-opacity" aria-haspopup="true" aria-expanded="false">
-							<span class="box-border text-center text-base font-bold leading-[26px] uppercase m-0 p-0" data-currency-label>MXN</span>
+							<span class="box-border text-center text-base font-bold leading-[26px] uppercase m-0 p-0" data-currency-label><?php echo esc_html( $current_currency_label ); ?></span>
 							<svg width="7" height="5" viewBox="0 0 7 5" fill="none" xmlns="http://www.w3.org/2000/svg">
 								<path d="M3.95007 3.94964C3.86649 4.03325 3.76726 4.09956 3.65805 4.14481C3.54884 4.19006 3.43178 4.21335 3.31357 4.21335C3.19535 4.21335 3.0783 4.19006 2.96909 4.14481C2.85987 4.09956 2.76064 4.03325 2.67707 3.94964L0.277068 1.54964C0.190585 1.46672 0.121529 1.36737 0.0739491 1.25741C0.0263693 1.14745 0.00122424 1.0291 -1.22098e-05 0.90929C-0.00124866 0.789484 0.0214488 0.670637 0.0667488 0.559719C0.112049 0.4488 0.179041 0.348043 0.263794 0.263356C0.348548 0.178669 0.449357 0.111757 0.56031 0.0665441C0.671264 0.0213309 0.790129 -0.00127264 0.909934 5.77203e-05C1.02974 0.00138809 1.14807 0.0266266 1.25721 0.0739795C1.36636 0.121332 1.46558 0.190091 1.54907 0.276644L3.31357 2.04114L5.07807 0.276644C5.24908 0.105639 5.48757 0.0095184 5.73532 0.0095184C5.98307 0.0095184 6.22156 0.105639 6.39257 0.276644C6.56357 0.44765 6.65969 0.686139 6.65969 0.933889C6.65969 1.18164 6.56357 1.42013 6.39257 1.59114L3.94944 3.94964H3.95007Z" fill="currentColor"/>
 							</svg>
 						</button>
+						<?php if ( ! empty( $available_currencies ) ) : ?>
+							<div class="fusion-currency-dropdown absolute right-0 mt-2 min-w-[140px] rounded-md bg-white text-[#2D2D2D] shadow-lg hidden" data-currency-dropdown>
+								<?php foreach ( $available_currencies as $code => $currency ) : ?>
+									<?php
+									$option_label = isset( $currency['name'] ) ? $currency['name'] : $code;
+									$option_symbol = isset( $currency['symbol'] ) ? $currency['symbol'] : '';
+									$is_active     = $code === $current_currency_code;
+									?>
+									<button
+										type="button"
+										class="fusion-currency-dropdown__option flex w-full items-center justify-between px-4 py-2 text-sm font-semibold uppercase hover:bg-[#F5F5F5] <?php echo $is_active ? 'is-active' : ''; ?>"
+										data-currency-code="<?php echo esc_attr( $code ); ?>"
+										data-currency-label="<?php echo esc_attr( $option_label ); ?>"
+										<?php echo $is_active ? 'data-active="true"' : ''; ?>
+									>
+										<span><?php echo esc_html( $option_label ); ?></span>
+										<?php if ( $option_symbol !== '' ) : ?>
+											<span class="text-xs text-[#475569]"><?php echo esc_html( $option_symbol ); ?></span>
+										<?php endif; ?>
+									</button>
+								<?php endforeach; ?>
+							</div>
+						<?php endif; ?>
 					</div>
 				</div>
 

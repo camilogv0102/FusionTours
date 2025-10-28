@@ -1197,60 +1197,82 @@ if (function_exists('wp_register_script')) {
 }
 
 $cart          = WC()->cart;
-$cart_items    = $cart ? $cart->get_cart() : [];
-$primary_item  = !empty($cart_items) ? reset($cart_items) : null;
-$trip_name     = '';
-$trip_date     = '';
-$person_count  = $initial_travelers;
-$person_rows   = [];
-$extras_rows   = [];
-$seguro_block  = ['label' => '', 'total' => ''];
-$discount_rows = [];
-$cart_person_count = 0;
+$cart_items        = $cart ? $cart->get_cart() : [];
+$cart_item_count   = $cart ? $cart->get_cart_contents_count() : 0;
+$product_rows      = [];
+$cart_totals       = $cart ? $cart->get_totals() : [];
+$subtotal_amount   = 0;
+$discount_amount   = 0;
+$fee_amount        = 0;
+$tax_amount        = 0;
+$total_amount      = 0;
+$shipping_display  = '';
+$shipping_is_html  = true;
+$show_shipping_row = false;
 
-if ($primary_item && isset($primary_item['data']) && is_object($primary_item['data']) && method_exists($primary_item['data'], 'get_name')) {
-    $trip_name = $primary_item['data']->get_name();
-}
+if (!empty($cart_items)) {
+    foreach ($cart_items as $cart_item_key => $cart_item) {
+        if (empty($cart_item['data']) || !is_object($cart_item['data'])) {
+            continue;
+        }
 
-if (function_exists('manaslu_collect_summary_data')) {
-    $summary_data = manaslu_collect_summary_data(0);
-    if (!empty($summary_data['fecha']['label'])) {
-        $trip_date = $summary_data['fecha']['label'];
-    }
-    if (isset($summary_data['personas_count'])) {
-        $cart_person_count = max(0, (int) $summary_data['personas_count']);
-    }
-    if (!empty($summary_data['personas']) && is_array($summary_data['personas'])) {
-        $person_rows = $summary_data['personas'];
-    }
-    if (!empty($summary_data['extras']) && is_array($summary_data['extras'])) {
-        $extras_rows = $summary_data['extras'];
-    }
-    if (!empty($summary_data['seguro']) && is_array($summary_data['seguro'])) {
-        $seguro_block = $summary_data['seguro'];
-    }
-    if (!empty($summary_data['cart_totals_raw']['discount_total'])) {
-        $discount_rows[] = [
-            'label' => __('Cupones aplicados', 'manaslu'),
-            'value' => $summary_data['coupon_total'],
-        ];
-    }
-    if (!empty($summary_data['pax_discount_raw'])) {
-        $discount_rows[] = [
-            'label' => __('Descuento por personas', 'manaslu'),
-            'value' => $summary_data['pax_discount_total'],
+        $product = $cart_item['data'];
+        if (!$product || !$product->exists()) {
+            continue;
+        }
+
+        $product_name = apply_filters('woocommerce_cart_item_name', $product->get_name(), $cart_item, $cart_item_key);
+        $quantity     = isset($cart_item['quantity']) ? (int) $cart_item['quantity'] : 0;
+        $line_subtotal = $cart ? $cart->get_product_subtotal($product, $quantity) : '';
+        $meta_data     = wc_get_formatted_cart_item_data($cart_item);
+
+        $product_rows[] = [
+            'name'         => $product_name,
+            'quantity'     => $quantity,
+            'subtotal'     => $line_subtotal,
+            'meta'         => $meta_data,
         ];
     }
 }
 
-if ($cart_person_count > 0) {
-    $initial_travelers = $cart_person_count;
-    if ($initial_travelers < $min_travelers) {
-        $initial_travelers = $min_travelers;
+if (!empty($cart_totals)) {
+    $subtotal_amount = $cart_totals['subtotal'] ?? 0;
+    if ($cart && $cart->display_prices_including_tax()) {
+        $subtotal_amount += $cart_totals['subtotal_tax'] ?? 0;
+    }
+
+    $discount_amount = ($cart_totals['discount_total'] ?? 0) + ($cart_totals['discount_tax'] ?? 0);
+    $fee_amount      = ($cart_totals['fee_total'] ?? 0) + ($cart_totals['fee_tax'] ?? 0);
+    $tax_amount      = $cart_totals['total_tax'] ?? 0;
+$total_amount    = isset($cart_totals['total']) ? (float) $cart_totals['total'] : 0.0;
+
+    if ($cart && $cart->needs_shipping()) {
+        $show_shipping_row = true;
+        $shipping_total = ($cart_totals['shipping_total'] ?? 0) + ($cart_totals['shipping_tax'] ?? 0);
+        if ($shipping_total > 0) {
+            $shipping_display = wc_price($shipping_total);
+            $shipping_is_html = true;
+        } elseif ($cart->show_shipping()) {
+            $shipping_display = __('Por calcular', 'manaslu');
+            $shipping_is_html = false;
+        } else {
+            $shipping_display = __('Gratis', 'manaslu');
+            $shipping_is_html = false;
+        }
     }
 }
 
-$person_count = $cart_person_count > 0 ? $cart_person_count : $initial_travelers;
+$subtotal_display = wc_price($subtotal_amount);
+$discount_display = $discount_amount > 0 ? wc_price(-1 * $discount_amount) : '';
+$fee_display      = $fee_amount > 0 ? wc_price($fee_amount) : '';
+$tax_display      = ($tax_amount > 0 && wc_tax_enabled()) ? wc_price($tax_amount) : '';
+
+if ($cart && method_exists($cart, 'get_total')) {
+    $total_amount = (float) $cart->get_total('float');
+}
+
+$total_display = wc_price($total_amount);
+
 if ($initial_travelers > $max_travelers) {
     $max_travelers = $initial_travelers;
 }
@@ -1350,40 +1372,6 @@ if (!function_exists('manaslu_checkout_order_button_text')) {
                 </div>
             </section>
 
-            <section class="mvcf-section">
-                <header class="mvcf-section-header">
-                    <h2><?php echo esc_html__('Personas que viajan', 'manaslu'); ?></h2>
-                    <p><?php echo esc_html__('Añade la información de cada acompañante para poder emitir la experiencia.', 'manaslu'); ?></p>
-                </header>
-
-                <div class="mvcf-traveler-count">
-                    <span class="mvcf-field-label">
-                        <?php echo esc_html__('Número de personas', 'manaslu'); ?>
-                    </span>
-                    <div class="mvcf-count-display">
-                        <span class="mvcf-count-value"><?php echo esc_html($initial_travelers); ?></span>
-                        <span class="mvcf-count-note"><?php echo esc_html__('Personas añadidas en tu reserva', 'manaslu'); ?></span>
-                    </div>
-                    <input
-                        type="hidden"
-                        id="mv_travelers_total"
-                        name="mv_travelers_total"
-                        value="<?php echo esc_attr($initial_travelers); ?>"
-                        data-traveler-count
-                    />
-                </div>
-
-                <div class="mvcf-travelers" data-travelers-wrapper>
-                    <?php for ($i = 0; $i < $initial_travelers; $i++) : ?>
-                        <?php echo manaslu_checkout_render_traveler_card($i, $traveler_fields, $traveler_title_pattern, $remove_title_pattern); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-                    <?php endfor; ?>
-                </div>
-
-                <template data-traveler-template>
-                    <?php echo manaslu_checkout_render_traveler_card(0, $traveler_fields, $traveler_title_pattern, $remove_title_pattern, true); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-                </template>
-            </section>
-
             <?php do_action('woocommerce_checkout_after_customer_details'); ?>
         </div>
 
@@ -1398,100 +1386,97 @@ if (!function_exists('manaslu_checkout_order_button_text')) {
             <div class="mvcf-summary-card">
                 <div class="mvcf-summary-block">
                     <div class="mvcf-summary-row">
-                        <strong><?php echo esc_html__('Nombre del viaje', 'manaslu'); ?></strong>
-                        <span><?php echo esc_html($trip_name); ?></span>
-                    </div>
-                </div>
-
-                <?php if ($trip_date !== '') : ?>
-                    <div class="mvcf-summary-block">
-                        <div class="mvcf-summary-row">
-                            <strong><?php echo esc_html__('Fecha del viaje', 'manaslu'); ?></strong>
-                            <span><?php echo esc_html($trip_date); ?></span>
-                        </div>
-                    </div>
-                <?php endif; ?>
-
-                <div class="mvcf-summary-block">
-                    <div class="mvcf-summary-row">
-                        <strong><?php echo esc_html__('Número de personas', 'manaslu'); ?></strong>
-                        <span><?php echo esc_html($person_count); ?></span>
-                    </div>
-                    <?php if (!empty($person_rows)) : ?>
-                        <ul class="mvcf-summary-list">
-                            <?php foreach ($person_rows as $row) : ?>
-                                <li>
-                                    <span>
-                                        <span><?php echo esc_html($row['title'] . ' × ' . $row['qty']); ?></span>
-                                        <span><?php echo wp_kses_post($row['total']); ?></span>
-                                    </span>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
-                    <?php endif; ?>
-                </div>
-
-                <div class="mvcf-summary-block">
-                    <div class="mvcf-summary-row">
-                        <strong><?php echo esc_html__('Extras añadidos', 'manaslu'); ?></strong>
-                        <span><?php echo empty($extras_rows) ? esc_html__('Sin extras', 'manaslu') : ''; ?></span>
-                    </div>
-                    <?php if (!empty($extras_rows)) : ?>
-                        <ul class="mvcf-summary-list">
-                            <?php foreach ($extras_rows as $row) : ?>
-                                <li>
-                                    <span>
-                                        <span><?php echo esc_html($row['title'] . ' × ' . $row['qty']); ?></span>
-                                        <span><?php echo wp_kses_post($row['total']); ?></span>
-                                    </span>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
-                    <?php endif; ?>
-                </div>
-
-                <div class="mvcf-summary-block">
-                    <div class="mvcf-summary-row">
-                        <strong><?php echo esc_html__('Descuentos', 'manaslu'); ?></strong>
-                        <span><?php echo empty($discount_rows) ? esc_html__('Sin descuentos', 'manaslu') : ''; ?></span>
-                    </div>
-                    <?php if (!empty($discount_rows)) : ?>
-                        <ul class="mvcf-summary-list">
-                            <?php foreach ($discount_rows as $row) : ?>
-                                <li>
-                                    <span>
-                                        <span><?php echo esc_html($row['label']); ?></span>
-                                        <span><?php echo wp_kses_post($row['value']); ?></span>
-                                    </span>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
-                    <?php endif; ?>
-                </div>
-
-                <div class="mvcf-summary-block">
-                    <div class="mvcf-summary-row">
-                        <strong><?php echo esc_html__('Seguros', 'manaslu'); ?></strong>
+                        <strong><?php echo esc_html__('Productos del pedido', 'manaslu'); ?></strong>
                         <span>
                             <?php
-                            if (!empty($seguro_block['label'])) {
-                                echo esc_html($seguro_block['label']);
-                            } else {
-                                echo esc_html__('Sin seguros', 'manaslu');
-                            }
+                            echo esc_html(
+                                sprintf(
+                                    _n('%d artículo', '%d artículos', $cart_item_count, 'manaslu'),
+                                    $cart_item_count
+                                )
+                            );
                             ?>
                         </span>
                     </div>
-                    <?php if (!empty($seguro_block['label'])) : ?>
+                    <?php if (!empty($product_rows)) : ?>
                         <ul class="mvcf-summary-list">
+                            <?php foreach ($product_rows as $row) : ?>
+                                <li>
+                                    <span>
+                                        <span>
+                                            <?php echo wp_kses_post($row['name']); ?>
+                                            <span class="mvcf-summary-quantity">× <?php echo esc_html($row['quantity']); ?></span>
+                                        </span>
+                                        <span><?php echo wp_kses_post($row['subtotal']); ?></span>
+                                    </span>
+                                    <?php if (!empty($row['meta'])) : ?>
+                                        <div class="mvcf-summary-meta">
+                                            <?php echo wp_kses_post($row['meta']); ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php else : ?>
+                        <p class="mvcf-field-note"><?php echo esc_html__('Tu carrito está vacío.', 'manaslu'); ?></p>
+                    <?php endif; ?>
+                </div>
+
+                <div class="mvcf-summary-block">
+                    <ul class="mvcf-summary-list">
+                        <li>
+                            <span>
+                                <span><?php echo esc_html__('Subtotal', 'manaslu'); ?></span>
+                                <span><?php echo wp_kses_post($subtotal_display); ?></span>
+                            </span>
+                        </li>
+                        <?php if ($discount_display !== '') : ?>
                             <li>
                                 <span>
-                                    <span><?php echo esc_html__('Total seguro', 'manaslu'); ?></span>
-                                    <span><?php echo wp_kses_post($seguro_block['total']); ?></span>
+                                    <span><?php echo esc_html__('Descuentos', 'manaslu'); ?></span>
+                                    <span><?php echo wp_kses_post($discount_display); ?></span>
                                 </span>
                             </li>
-                        </ul>
-                    <?php endif; ?>
+                        <?php endif; ?>
+                        <?php if ($fee_display !== '') : ?>
+                            <li>
+                                <span>
+                                    <span><?php echo esc_html__('Cargos adicionales', 'manaslu'); ?></span>
+                                    <span><?php echo wp_kses_post($fee_display); ?></span>
+                                </span>
+                            </li>
+                        <?php endif; ?>
+                        <?php if ($show_shipping_row) : ?>
+                            <li>
+                                <span>
+                                    <span><?php echo esc_html__('Envío', 'manaslu'); ?></span>
+                                    <span>
+                                        <?php
+                                        if ($shipping_is_html) {
+                                            echo wp_kses_post($shipping_display);
+                                        } else {
+                                            echo esc_html($shipping_display);
+                                        }
+                                        ?>
+                                    </span>
+                                </span>
+                            </li>
+                        <?php endif; ?>
+                        <?php if ($tax_display !== '') : ?>
+                            <li>
+                                <span>
+                                    <span><?php echo esc_html__('Impuestos', 'manaslu'); ?></span>
+                                    <span><?php echo wp_kses_post($tax_display); ?></span>
+                                </span>
+                            </li>
+                        <?php endif; ?>
+                        <li>
+                            <span>
+                                <span><?php echo esc_html__('Total', 'manaslu'); ?></span>
+                                <span><?php echo wp_kses_post($total_display); ?></span>
+                            </span>
+                        </li>
+                    </ul>
                 </div>
             </div>
 

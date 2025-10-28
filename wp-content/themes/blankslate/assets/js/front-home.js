@@ -79,7 +79,102 @@
 	}
 
 	const currencyToggle = $('.fusion-currency-toggle');
-	if (currencyToggle) {
+	const currencySwitcher = $('[data-currency-switcher]');
+	const dropdown = currencySwitcher ? currencySwitcher.querySelector('[data-currency-dropdown]') : null;
+	if (currencyToggle && currencySwitcher && dropdown) {
+		const label = currencySwitcher.querySelector('[data-currency-label]');
+		const optionButtons = dropdown.querySelectorAll('[data-currency-code]');
+		const activeClass = 'is-open';
+
+		const closeDropdown = () => {
+			if (dropdown) {
+				dropdown.classList.add('hidden');
+			}
+			currencySwitcher.classList.remove(activeClass);
+			currencyToggle.setAttribute('aria-expanded', 'false');
+		};
+
+		const openDropdown = () => {
+			if (dropdown) {
+				dropdown.classList.remove('hidden');
+			}
+			currencySwitcher.classList.add(activeClass);
+			currencyToggle.setAttribute('aria-expanded', 'true');
+		};
+
+		const toggleDropdown = (event) => {
+			event.preventDefault();
+			event.stopPropagation();
+			if (!dropdown) {
+				return;
+			}
+			if (dropdown.classList.contains('hidden')) {
+				openDropdown();
+			} else {
+				closeDropdown();
+			}
+		};
+
+		const maybeCloseOnOutside = (event) => {
+			if (!currencySwitcher.contains(event.target)) {
+				closeDropdown();
+			}
+		};
+
+		currencyToggle.addEventListener('click', toggleDropdown);
+		document.addEventListener('click', maybeCloseOnOutside);
+
+		if (optionButtons && optionButtons.length > 0) {
+			const updateActiveState = (targetButton) => {
+				optionButtons.forEach((button) => {
+					button.classList.remove('is-active');
+					button.removeAttribute('data-active');
+				});
+				targetButton.classList.add('is-active');
+				targetButton.setAttribute('data-active', 'true');
+			};
+
+			optionButtons.forEach((button) => {
+				button.addEventListener('click', (event) => {
+					event.preventDefault();
+					event.stopPropagation();
+					const targetCurrency = button.getAttribute('data-currency-code');
+					const targetLabel = button.getAttribute('data-currency-label') || targetCurrency;
+
+					if (!targetCurrency) {
+						closeDropdown();
+						return;
+					}
+
+					updateActiveState(button);
+					if (label) {
+						label.textContent = targetLabel;
+					}
+					closeDropdown();
+
+					const currentCurrency =
+						window.woocs_current_currency && window.woocs_current_currency.name
+							? window.woocs_current_currency.name
+							: null;
+					if (currentCurrency && currentCurrency === targetCurrency) {
+						return;
+					}
+
+					if (typeof window.woocs_redirect === 'function') {
+						window.woocs_redirect(targetCurrency);
+					} else {
+						const fallbackForm = document.createElement('form');
+						fallbackForm.method = 'post';
+						fallbackForm.action = window.location.href;
+						fallbackForm.classList.add('woocs-fallback-form');
+						fallbackForm.innerHTML = `<input type="hidden" name="woocommerce-currency-switcher" value="${targetCurrency}" />`;
+						document.body.appendChild(fallbackForm);
+						fallbackForm.submit();
+					}
+				});
+			});
+		}
+	} else if (currencyToggle) {
 		const label = currencyToggle.querySelector('[data-currency-label]');
 		const currencies = ['MXN', 'USD'];
 		let index = 0;

@@ -118,6 +118,19 @@ $pricing_options = $sanitize_meta_array( get_post_meta( $product_id, 'fusion_pri
 
 $product_type = $product->get_type();
 
+$base_currency    = function_exists( 'get_option' ) ? strtoupper( (string) get_option( 'woocommerce_currency' ) ) : 'USD';
+$current_currency = function_exists( 'get_woocommerce_currency' ) ? strtoupper( (string) get_woocommerce_currency() ) : $base_currency;
+$can_convert_prices = ( $current_currency && $base_currency && $current_currency !== $base_currency && has_filter( 'woocs_convert_price' ) );
+
+$convert_price = static function ( $amount ) use ( $can_convert_prices ) {
+	$numeric = is_numeric( $amount ) ? (float) $amount : 0.0;
+	if ( ! $can_convert_prices ) {
+		return $numeric;
+	}
+	$converted = apply_filters( 'woocs_convert_price', $numeric, false );
+	return is_numeric( $converted ) ? (float) $converted : $numeric;
+};
+
 $trip_dates_raw = get_post_meta( $product_id, '_viaje_fechas', true );
 $trip_dates     = array();
 if ( is_array( $trip_dates_raw ) ) {
@@ -207,11 +220,18 @@ if ( 'viaje' === $product_type && function_exists( 'mv_get_persona_price_matrix'
         };
 
         $child_extra_id = $resolve_child_extra( $product_id, $adult_extra_id );
-        $currency       = get_woocommerce_currency();
+        $currency       = $current_currency;
 
         foreach ( (array) $location_labels as $location_key => $location_label ) {
             $adult_price = ( $adult_extra_id && isset( $matrix[ $adult_extra_id ][ $location_key ] ) ) ? (float) $matrix[ $adult_extra_id ][ $location_key ] : 0;
             $child_price = ( $child_extra_id && isset( $matrix[ $child_extra_id ][ $location_key ] ) ) ? (float) $matrix[ $child_extra_id ][ $location_key ] : 0;
+
+            if ( $can_convert_prices ) {
+                $adult_price = $convert_price( $adult_price );
+                if ( $child_price > 0 ) {
+                    $child_price = $convert_price( $child_price );
+                }
+            }
 
             if ( $adult_price <= 0 && $child_price <= 0 ) {
                 continue;
@@ -246,17 +266,20 @@ if ( 'viaje' === $product_type && function_exists( 'mv_get_persona_price_matrix'
                         continue;
                     }
                     $location_label = isset( $location_labels[ $location_key ] ) ? $location_labels[ $location_key ] : $location_key;
-                    $label          = sprintf( __( 'Desde %s', 'blankslate' ), $location_label );
-                    if ( function_exists( 'mb_strtoupper' ) ) {
-                        $label = mb_strtoupper( $label, 'UTF-8' );
-                    } else {
-                        $label = strtoupper( $label );
-                    }
-                    $pricing_override[] = array(
-                        'location'   => $label,
-                        'location_key' => $location_key,
-                        'adults'     => $value,
-                        'children'   => $value,
+                $label          = sprintf( __( 'Desde %s', 'blankslate' ), $location_label );
+                if ( function_exists( 'mb_strtoupper' ) ) {
+                    $label = mb_strtoupper( $label, 'UTF-8' );
+                } else {
+                    $label = strtoupper( $label );
+                }
+                if ( $can_convert_prices ) {
+                    $value = $convert_price( $value );
+                }
+                $pricing_override[] = array(
+                    'location'   => $label,
+                    'location_key' => $location_key,
+                    'adults'     => $value,
+                    'children'   => $value,
                         'currency'   => $currency,
                         'price_html' => '',
                         'raw_label'  => $location_label,
@@ -303,7 +326,25 @@ if ( empty( $pricing_options ) ) {
 	foreach ( $pricing_options as &$pricing_option ) {
 		$pricing_option['adults']   = isset( $pricing_option['adults'] ) ? (float) $pricing_option['adults'] : 0;
 		$pricing_option['children'] = isset( $pricing_option['children'] ) && '' !== $pricing_option['children'] ? (float) $pricing_option['children'] : $pricing_option['adults'];
-		$pricing_option['currency'] = isset( $pricing_option['currency'] ) ? strtoupper( (string) $pricing_option['currency'] ) : get_woocommerce_currency();
+
+		$existing_currency = isset( $pricing_option['currency'] ) ? strtoupper( (string) $pricing_option['currency'] ) : '';
+		$should_convert    = $can_convert_prices && ( '' === $existing_currency || $existing_currency === $base_currency );
+
+		if ( $should_convert ) {
+			$pricing_option['adults'] = $convert_price( $pricing_option['adults'] );
+			if ( $pricing_option['children'] > 0 ) {
+				$pricing_option['children'] = $convert_price( $pricing_option['children'] );
+			}
+			$pricing_option['price_html'] = '';
+		} elseif ( empty( $pricing_option['price_html'] ) ) {
+			$pricing_option['price_html'] = '';
+		}
+
+		if ( $pricing_option['children'] <= 0 ) {
+			$pricing_option['children'] = $pricing_option['adults'];
+		}
+
+		$pricing_option['currency'] = $current_currency;
 		if ( empty( $pricing_option['location_key'] ) ) {
 			$raw_location = '';
 			if ( ! empty( $pricing_option['raw_label'] ) ) {
